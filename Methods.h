@@ -30,20 +30,45 @@ double ans_3() {
     return 0.25 * log(2) + 0.5 + (sin(200) - sin(100)) / 100;  // 0.669617478578944
 }
 
+auto f1 = [](double x) { return ftest_1(x); };
+auto f2 = [](double x) { return ftest_2(x); };
+auto f3 = [](double x) { return ftest_3(x); };
 
-class G_Func {
-private:
-    HillFunc hill;
-    NumIntegration<HillFunc> I;
-public:
-    
-    double operator()(double x) {
-        hill.x = x;
-        return I.adaptiveIntegral(0.1);
+template <class F>
+double rectInteg(F func, double a, double b, int steps = 1) {
+    double res = 0;
+    double h = (b - a) / steps;
+    for (int i = 0; i < steps; ++i) {
+        res += func(a + i * h + h/ 2);
     }
-};
+    return res*h;
+}
 
-class HillFunc {
+template <class F>
+double trapInteg(F func, double a, double b, int steps = 1) {
+    double res = 0;
+    double h = (b - a) / steps;
+    for (int i = 0; i < steps; ++i) {
+        res += func(a + i * h) + func(a+(i+1)*h);
+    }
+    return res*h/2;
+}
+
+template <class F>
+double simpInteg(F func, double a, double b, int steps = 1) {
+    double res = 0;
+    double h = (b - a) /(steps);
+    for (int i = 0; i < steps; ++i) {
+        res += func(a + i * h) + 4 * func(a + i * h + h / 2) + func(a + (i + 1) * h);
+    }
+    return res * h / 6;
+}
+
+enum class IntegType{rect,trap,simp};
+
+int counter = 0;
+
+class THillFunc {
 private:
     std::vector<double> A, B;
     double alp;
@@ -53,7 +78,7 @@ public:
     friend class G_Func;
 
 public:
-    HillFunc(uint64_t seed = 0) {
+    THillFunc(uint64_t seed = 0) {
         A.resize(num_coeffs); B.resize(num_coeffs);
         std::uniform_real_distribution<double> distr1(-1, 1);
         std::uniform_real_distribution<double> distr2(0, 1);
@@ -64,12 +89,12 @@ public:
         }
         alp = distr2(gen);
     }
-    HillFunc(const std::vector<double>& _A, const std::vector<double>& _B,
+    THillFunc(const std::vector<double>& _A, const std::vector<double>& _B,
         double _alp) : A(_A), B(_B) {
         alp = _alp;
     }
 
-    double operator() (double t){
+    double operator() (double t) {
         double res = 0.0;
         for (int i = 0; i < num_coeffs; ++i) {
             res += A[i] * sin(2 * M_PI * (i + 1) * (alp - x) * t) + B[i] * cos(2 * M_PI * (i + 1) * (alp - x) * t);
@@ -86,79 +111,50 @@ public:
     }
 };
 
-
 template <class F>
-class NumIntegration {
- private:
-    F func;
-    double a = 1.0, b = 2.0;
-    double result = 0.0;
-    int64_t adap_count = 0;
-
- public:
-     enum class IntegeralType {midp, trap, simp};
-
-    NumIntegration(const F& _func, double _a, double _b) : func(_func) {
-        a = _a; b = _b;
+double adapInteg(const F& func, double a, double b, double eps, IntegType type) {
+    double h = (b - a);
+    ++counter;
+    if (type == IntegType::rect) {
+        double i1 = rectInteg(func, a, b, 1);
+        double i2 = rectInteg(func, a, b, 2);
+        if (fabs(i2 - i1) > eps) {
+            return adapInteg(func, a, a + h / 2, eps / 2, type) + adapInteg(func, a + h / 2, b, eps / 2, type);
+        }
+        return i1;
     }
-
-    double midpointIntegral(int steps = 1) {
-        result = 0;
-        const double h = (b - a) / steps;
-        for (int i = 0; i < steps; ++i) {
-            double x = a + i * h;
-            result += func(x + h / 2);
+    if (type == IntegType::trap) {
+        double i1 = trapInteg(func, a, b, 1);
+        double i2 = trapInteg(func, a, b, 2);
+        if (fabs(i2 - i1) > eps) {
+            return adapInteg(func, a, a + h / 2, eps / 2, type) + adapInteg(func, a + h / 2, b, eps / 2, type);
         }
-        result *= h;
-        return result;
+        return i1;
     }
-
-    double trapezoidalIntegral(int steps = 1) {
-        result = 0;
-        const double h = (b - a) / steps;
-        for (int i = 0; i < steps; ++i) {
-            double x = a + i * h;
-            result += (func(x) + func(x+h))/2;
+    if (type == IntegType::simp) {
+        double i1 = simpInteg(func, a, b, 1);
+        double i2 = simpInteg(func, a, b, 2);
+        if (fabs(i2 - i1) > eps) {
+            return adapInteg(func, a, a + h / 2, eps / 2, type) + adapInteg(func, a + h / 2, b, eps / 2, type);
         }
-        result *= h;
-        return result;
+        return i1;
     }
+}
 
-    double simpsonIntegral(int steps = 1) {
-        result = 0;
-        const double h = (b - a) /(2 * steps);
-        for (int i = 0; i < steps; ++i) {
-            double x = a + 2 * i * h;
-            result += (func(x) + 4 * func(x + h) + func(x + 2*h)) / 3;
-        }
-        result *= h;
-        return result;
+
+
+
+
+class G_Func {
+public:
+    THillFunc hill;
+public:
+    G_Func(const THillFunc& h) {
+        hill = h;
     }
-
-    double adaptiveIntegral(double eps, IntegeralType type = IntegeralType::simp) {
-        if (type == IntegeralType::midp) {
-            double i1 = midpointIntegral(1);
-            double i2 = midpointIntegral(2);
-            if (fabs(i2 - i1) > eps) {
-                return adaptiveIntegral(eps / 2);
-            }
-            else return i1;  // Or i2 ???
-        }
-        if (type == IntegeralType::trap) {
-            double i1 = trapezoidalIntegral(1);
-            double i2 = trapezoidalIntegral(2);
-            if (fabs(i2 - i1) > eps) {
-                return adaptiveIntegral(eps / 2);
-            }
-            else return i1;  // Or i2 ???
-        }
-        if (type == IntegeralType::simp) {
-            double i1 = simpsonIntegral(1);
-            double i2 = simpsonIntegral(2);
-            if (fabs(i2 - i1) > eps) {
-                return adaptiveIntegral(eps / 2);
-            }
-            else return i1;  // Or i2 ???
-        }
+    std::pair<double, int> operator()(double x, double eps, IntegType type = IntegType::simp) {
+        counter = 0;
+        hill.x = x;
+        return std::make_pair(adapInteg(hill,-M_PI_2,M_PI_2,eps,type), counter);//I.adaptiveIntegral(0.1);
     }
 };
