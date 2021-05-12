@@ -39,7 +39,7 @@ double rectInteg(F func, double a, double b, int steps = 1) {
     double res = 0;
     double h = (b - a) / steps;
     for (int i = 0; i < steps; ++i) {
-        res += func(a + i * h + h/ 2);
+        res += func(a + i * h + h / 2);
     }
     return res*h;
 }
@@ -49,9 +49,9 @@ double trapInteg(F func, double a, double b, int steps = 1) {
     double res = 0;
     double h = (b - a) / steps;
     for (int i = 0; i < steps; ++i) {
-        res += func(a + i * h) + func(a+(i+1)*h);
+        res += func(a + i * h) + func(a + (i + 1) * h);
     }
-    return res*h/2;
+    return res * h / 2;
 }
 
 template <class F>
@@ -111,6 +111,12 @@ public:
     }
 };
 
+struct TResults {
+    double x;
+    double y;
+    int T;
+};
+
 template <class F>
 double adapInteg(const F& func, double a, double b, double eps, IntegType type) {
     double h = (b - a);
@@ -152,9 +158,13 @@ public:
     G_Func(const THillFunc& h) {
         hill = h;
     }
-    std::pair<double, int> operator()(double x, double eps, IntegType type = IntegType::simp) {
+    TResults operator()(double x, double eps, IntegType type = IntegType::simp) {
         counter = 0;
         hill.x = x;
-        return std::make_pair(adapInteg(hill,-M_PI_2,M_PI_2,eps,type), counter);//I.adaptiveIntegral(0.1);
+        TResults res;
+        res.x = x;
+        res.y = adapInteg(hill, -M_PI_2, M_PI_2, eps, type);
+        res.T = counter;
+        return res;
     }
 };
