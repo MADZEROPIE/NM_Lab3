@@ -66,7 +66,7 @@ double simpInteg(F func, double a, double b, int steps = 1) {
 
 enum class IntegType{rect,trap,simp};
 
-int counter = 0;
+static int counter = 0;
 
 class THillFunc {
 private:
@@ -146,8 +146,6 @@ double adapInteg(const F& func, double a, double b, double eps, IntegType type) 
         return i1;
     }
 }
-
-
 
 
 
