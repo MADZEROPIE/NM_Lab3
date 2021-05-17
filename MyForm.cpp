@@ -1,15 +1,12 @@
 #include "MyForm.h"
 
-using namespace System;
-using namespace System::Windows::Forms;
+#include <Windows.h>
 
+using namespace DirikhleGUI;
 
-[STAThread]
-void Main(array<String^>^ args)
-{
-	Application::EnableVisualStyles();
-	Application::SetCompatibleTextRenderingDefault(false);
-
-	Graph::MyForm form;
-	Application::Run(%form);
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+    Application::EnableVisualStyles();
+    Application::SetCompatibleTextRenderingDefault(false);
+    Application::Run(gcnew MyForm);
+    return 0;
 }
